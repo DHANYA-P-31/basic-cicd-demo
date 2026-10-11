@@ -1,0 +1,71 @@
+
+name: Basic CI-CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build application
+        run: |
+          mkdir -p dist
+          cp -r public/. dist/
+          test -f dist/index.html
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-build
+          path: dist/
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test application
+        run: |
+          test -f public/index.html
+          grep -q "Hello from CI/CD!" public/index.html
+          echo "All tests passed!"
+
+  deploy:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: website-build
+          path: dist/
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
